@@ -18,6 +18,7 @@ export class TimerCardEditor extends LitElement {
       <div class="card-config">
         <div>
           <ha-textfield
+            id="header"
             label="Header"
             .value="${this._config.header}"
             .configValue="${"header"}"
@@ -26,6 +27,7 @@ export class TimerCardEditor extends LitElement {
         </div>
         <div>
           <ha-textfield
+            id="entity"
             label="Entity"
             .configValue=${"entity"}
             .value="${this._config.entity}"
@@ -40,6 +42,7 @@ export class TimerCardEditor extends LitElement {
     const target = changedEvent.target as HTMLInputElement;
     // this._config is readonly, copy needed
     const newConfig = Object.assign({}, this._config);
+    console.log(newConfig);
     if (target.id == "header") {
       newConfig.header = target.value;
     } else if (target.id == "entity") {

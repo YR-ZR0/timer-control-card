@@ -42,4 +42,5 @@ to configure the card add the following to your dashboard
 
 - [ ] Better styling
 - [ ] Use the entity picker to select your timer entity (Couldn't get the Home Assistant examples to work)
-- [ ] Fix editor issues with state not updating
+- [x] Fix editor issues with state not updating
+  - [ ] Handle user pressing enter to accept the dialog
