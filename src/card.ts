@@ -1,13 +1,12 @@
 import {
-  html,
+  CSSResultGroup,
   LitElement,
   TemplateResult,
-  nothing,
-  PropertyValues,
-  CSSResultGroup,
   css,
+  html,
+  nothing,
 } from "lit";
-import { state, property } from "lit/decorators.js";
+import { property, state } from "lit/decorators.js";
 
 import { HomeAssistant, LovelaceCardConfig } from "custom-card-helpers";
 import { HassEntity } from "home-assistant-js-websocket";
@@ -22,9 +21,11 @@ export class TimerCard extends LitElement {
   @state() private _entity: string;
   @state() private _name: string;
   @state() private _state: HassEntity;
-  @property({ type: Number }) hours = 0;
-  @property({ type: Number }) minutes = 0;
-  @property({ type: Number }) seconds = 0;
+  @property({ type: Object }) timerDuration: TimerDuration = {
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
+  };
   @property({ type: Boolean }) isTimerActive = false;
   @property({ type: String }) remainingTime = "";
 
@@ -47,17 +48,19 @@ export class TimerCard extends LitElement {
       this._name = fn ? fn : this._entity;
     }
   }
-  handleInput(e) {
-    const inputId = e.target.id;
-    const inputValue = e.target.value;
-    this[inputId] = inputValue;
+
+  updateTime(unit: "hours" | "minutes" | "seconds", value: string) {
+    this.timerDuration[unit] = parseInt(value, 10);
   }
 
   updateTimerDuration() {
-    const newDuration = `${String(this.hours).padStart(2, "0")}:${String(
-      this.minutes
-    ).padStart(2, "0")}:${String(this.seconds).padStart(2, "0")}`;
-
+    const newDuration = `${this.timerDuration.hours
+      .toString()
+      .padStart(2, "0")}:${this.timerDuration.minutes
+      .toString()
+      .padStart(2, "0")}:${this.timerDuration.seconds
+      .toString()
+      .padStart(2, "0")}`;
     const serviceData = {
       entity_id: this._entity,
       duration: newDuration,
@@ -72,37 +75,62 @@ export class TimerCard extends LitElement {
       content = html` entity: ${this._entity} not available <br />`;
     } else {
       content = html`
-        <div>Timer: ${this._name}</div>
-        <div class="horizontal layout">
-          <div class="input-container">
-            <input
-              id="hours"
-              type="number"
-              .value=${this.hours}
-              @input=${this.handleInput}
-            />
-          </div>
-          <div class="input-container">
-            <input
-              id="minutes"
-              type="number"
-              .value=${this.minutes}
-              @input=${this.handleInput}
-            />
-          </div>
-          <div class="input-container">
-            <input
-              id="seconds"
-              type="number"
-              .value=${this.seconds}
-              @input=${this.handleInput}
-            />
+        <div class="card-content">
+          <div class="timer-duration">
+            <div>Timer: ${this._name}</div>
+            ${this.isTimerActive
+              ? html`<div>Remaining: ${this.remainingTime}</div>`
+              : ""}
+            <form id="time-inputs">
+              <div>
+                <label>Hours</label>
+                <input
+                  type="number"
+                  min="00"
+                  .value=${this.timerDuration.hours}
+                  @input=${(e: Event) =>
+                    this.updateTime(
+                      "hours",
+                      (e.target as HTMLInputElement).value
+                    )}
+                />
+              </div>
+              <span>:</span>
+              <div>
+                <label>Minutes</label>
+                <input
+                  type="number"
+                  min="00"
+                  max="59"
+                  .value=${this.timerDuration.minutes}
+                  @input=${(e: Event) =>
+                    this.updateTime(
+                      "minutes",
+                      (e.target as HTMLInputElement).value
+                    )}
+                />
+              </div>
+              <span>:</span>
+              <div>
+                <label>Seconds</label>
+                <input
+                  type="number"
+                  min="00"
+                  max="59"
+                  .value=${this.timerDuration.seconds}
+                  @input=${(e: Event) =>
+                    this.updateTime(
+                      "seconds",
+                      (e.target as HTMLInputElement).value
+                    )}
+                />
+              </div>
+            </form>
+            <div class="timer-controls">
+              <mwc-button @click=${this.updateTimerDuration}>Start</mwc-button>
+            </div>
           </div>
         </div>
-        ${this.isTimerActive
-          ? html`<div>Remaining Time: ${this.remainingTime}</div>`
-          : ""}
-        <button @click=${this.updateTimerDuration}>Apply</button>
       `;
     }
     return html`
@@ -169,31 +197,54 @@ export class TimerCard extends LitElement {
   static get styles(): CSSResultGroup {
     return [
       css`
+        .timer-duration {
+          align-items: center;
+          display: flex;
+          justify-content: space-between;
+        }
+
+        #time-inputs {
+          align-items: center;
+          display: flex;
+          justify-content: space-between;
+        }
+
+        #time-inputs > div {
+          align-items: center;
+          display: flex;
+          flex-direction: column-reverse;
+          margin: 0 10px;
+        }
+
+        .timer-controls mwc-button {
+          --mdc-theme-primary: white; /* This will change the text color */
+          --mdc-theme-on-primary: green; /* This will change the background color */
+        }
+
         input {
           width: 60px;
           padding: 4px;
           border: 1px solid #ccc;
           border-radius: 4px;
           box-sizing: border-box;
+          text-align: center;
         }
 
-        button {
-          margin-top: 5px;
-          padding: 8px;
-          background-color: #4caf50;
-          color: white;
+        #time-inputs > div > input {
           border: none;
-          border-radius: 4px;
-          cursor: pointer;
+          border-bottom: 1px solid black;
         }
 
-        .layout.horizontal,
-        .layout.vertical {
-          display: flex;
+        /* Hide arrows on number inputs for Chrome, Safari, Edge, Opera */
+        #time-inputs > div > input[type="number"]::-webkit-inner-spin-button,
+        #time-inputs > div > input[type="number"]::-webkit-outer-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
         }
 
-        .layout.horizontal {
-          flex-direction: row;
+        /* Hide arrows on number inputs for Firefox */
+        #time-inputs > div > input[type="number"] {
+          -moz-appearance: textfield;
         }
 
         button:hover {
@@ -202,9 +253,9 @@ export class TimerCard extends LitElement {
       `,
     ];
   }
-
+  //TODO: make this dynamic
   getCardSize() {
-    return 3;
+    return 4;
   }
 
   static getConfigElement() {

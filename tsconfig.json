@@ -7,7 +7,37 @@
         "strictNullChecks": true,
         "strictFunctionTypes": true,
         "experimentalDecorators": true,
-        "useDefineForClassFields": false
+        "useDefineForClassFields": false,
+        "plugins": [
+            {
+                "name": "ts-lit-plugin",
+                "strict": false,
+                // These tags are provided by the HA frontend and [almost all] cannot be
+                // imported by a custom card directly.
+                "globalTags": [
+                    "ha-card",
+                    "ha-combo-box",
+                    "ha-icon",
+                    "ha-icon-button",
+                    "ha-button-menu",
+                    "ha-circular-progress",
+                    "ha-selector",
+                    "ha-svg-icon",
+                    "mwc-button",
+                    "mwc-list-item",
+                    "paper-toast"
+                ],
+                "rules": {
+                    "no-unknown-tag-name": "error",
+                    "no-missing-import": "error",
+                    "no-unclosed-tag": "error",
+                    "no-incompatible-type-binding": "warning",
+                    "no-invalid-css": "warning",
+                    "no-missing-element-type-definition": "warning",
+                    "no-property-visibility-mismatch": "error"
+                }
+            }
+        ]
     },
     "exclude": [
         "node_modules",

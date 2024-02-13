@@ -1,5 +1,5 @@
 import { HomeAssistant } from "custom-card-helpers";
-import { css, html, LitElement } from "lit";
+import { html, LitElement } from "lit";
 import { property } from "lit/decorators";
 import { state } from "lit/decorators/state.js";
 
@@ -26,27 +26,29 @@ export class TimerCardEditor extends LitElement {
           ></ha-textfield>
         </div>
         <div>
-          <ha-textfield
+          <ha-selector
             id="entity"
             label="Entity"
-            .configValue=${"entity"}
+            .hass=${this.hass}
+            .selector=${{ entity: { domain: "timer" } }}
+            .configValue="${"entity"}"
             .value="${this._config.entity}"
-            @change="${this.handleChangedEvent}"
-          ></ha-textfield>
+            .required="${true}"
+            @value-changed="${this.handleChangedEvent}"
+          ></ha-selector>
         </div>
       </div>
     `;
   }
 
-  handleChangedEvent(changedEvent: Event) {
+  handleChangedEvent(changedEvent: CustomEvent) {
     const target = changedEvent.target as HTMLInputElement;
     // this._config is readonly, copy needed
     const newConfig = Object.assign({}, this._config);
-    console.log(newConfig);
     if (target.id == "header") {
       newConfig.header = target.value;
     } else if (target.id == "entity") {
-      newConfig.entity = target.value;
+      newConfig.entity = changedEvent.detail.value;
     }
     const messageEvent = new CustomEvent("config-changed", {
       detail: { config: newConfig },

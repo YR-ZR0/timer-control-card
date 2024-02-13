@@ -13,5 +13,6 @@ window.customCards = window.customCards || [];
 window.customCards.push({
   type: "timer-card",
   name: "Timer Card",
+  configurable: true,
   description: "A simple card to control a timer entity",
 });
