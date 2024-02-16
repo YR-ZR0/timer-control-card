@@ -19,6 +19,6 @@
   "dependencies": {
     "custom-card-helpers": "^1.9.0",
     "home-assistant-js-websocket": "^9.1.0",
-    "lit": "^2.8.0"
+    "lit": "^3.1.2"
   }
 }
