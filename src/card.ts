@@ -27,7 +27,8 @@ export class TimerCard extends LitElement {
     seconds: 0,
   };
   @property({ type: Boolean }) isTimerActive = false;
-  @property({ type: String }) remainingTime = "";
+  @property({ type: String }) remainingTime = "00:00:00";
+  @property({ type: String }) durationInput = "00:00:00";
 
   private timerUpdateInterval: number | undefined;
   private _hass;
@@ -46,21 +47,110 @@ export class TimerCard extends LitElement {
     if (this._state) {
       let fn = this._state.attributes.friendly_name;
       this._name = fn ? fn : this._entity;
+      
+      // Update timer state and duration
+      this.updateTimerStateFromEntity();
     }
   }
 
-  updateTime(unit: "hours" | "minutes" | "seconds", value: string) {
-    this.timerDuration[unit] = parseInt(value, 10);
+  // New method to update timer state from entity
+  updateTimerStateFromEntity() {
+    if (!this._state) return;
+    
+    // Update active state
+    this.isTimerActive = this._state.state === "active";
+    
+    // Get current duration from attributes
+    if (this._state.attributes.duration) {
+      const duration = this._state.attributes.duration;
+      // Only update the input if not currently focused
+      const activeElement = this.shadowRoot?.activeElement;
+      const inputField = this.shadowRoot?.querySelector(".single-time-field");
+      if (activeElement !== inputField) {
+        this.durationInput = duration;
+        this.updateTimerDurationFromString(duration, false);
+      }
+    }
+    
+    // Update remaining time
+    if (this.isTimerActive && this._state.attributes.finishes_at) {
+      this.remainingTime = this.calculateRemainingTimeFromTimestamp(
+        this._state.attributes.finishes_at
+      );
+    } else if (this._state.attributes.duration) {
+      // If not active but has duration, show the duration as remaining time
+      this.remainingTime = this._state.attributes.duration;
+    }
+  }
+
+  updateTime(value: string) {
+    // Store the input value directly without immediate reformatting
+    this.durationInput = value;
+    
+    // Only attempt to parse complete input formats
+    if (value.includes(':') || (!isNaN(Number(value)) && value.length > 0)) {
+      this.updateTimerDurationFromString(value, false);
+    }
+  }
+  
+  updateTimerDurationFromString(value: string, updateInput = true) {
+    let hours = 0;
+    let minutes = 0;
+    let seconds = 0;
+    
+    // Parse time based on format
+    if (value.includes(':')) {
+      const timeParts = value.split(':');
+      
+      if (timeParts.length === 3) {
+        // HH:MM:SS format
+        hours = parseInt(timeParts[0], 10) || 0;
+        minutes = parseInt(timeParts[1], 10) || 0;
+        seconds = parseInt(timeParts[2], 10) || 0;
+      } else if (timeParts.length === 2) {
+        // MM:SS format
+        minutes = parseInt(timeParts[0], 10) || 0;
+        seconds = parseInt(timeParts[1], 10) || 0;
+      }
+    } else if (!isNaN(Number(value))) {
+      // Single number interpreted as seconds
+      const totalSeconds = parseInt(value, 10) || 0;
+      hours = Math.floor(totalSeconds / 3600);
+      minutes = Math.floor((totalSeconds % 3600) / 60);
+      seconds = totalSeconds % 60;
+    }
+    
+    // Update timer duration object
+    this.timerDuration = { hours, minutes, seconds };
+    
+    // Update the input field if requested
+    if (updateInput) {
+      this.durationInput = this.formatTimeValue();
+    }
+  }
+  
+  // Format when leaving the input field or when submitting
+  handleBlur() {
+    // Format the input properly when the field loses focus
+    this.durationInput = this.formatTimeValue();
+  }
+  
+  // Handle key press for Enter key
+  handleKeyDown(e: KeyboardEvent) {
+    if (e.key === 'Enter') {
+      this.durationInput = this.formatTimeValue();
+      this.updateTimerDuration();
+    }
+  }
+
+  formatTimeValue(): string {
+    return `${this.timerDuration.hours.toString().padStart(2, '0')}:${
+      this.timerDuration.minutes.toString().padStart(2, '0')}:${
+      this.timerDuration.seconds.toString().padStart(2, '0')}`;
   }
 
   updateTimerDuration() {
-    const newDuration = `${this.timerDuration.hours
-      .toString()
-      .padStart(2, "0")}:${this.timerDuration.minutes
-      .toString()
-      .padStart(2, "0")}:${this.timerDuration.seconds
-      .toString()
-      .padStart(2, "0")}`;
+    const newDuration = this.formatTimeValue();
     const serviceData = {
       entity_id: this._entity,
       duration: newDuration,
@@ -69,65 +159,63 @@ export class TimerCard extends LitElement {
     this._hass.callService("timer", "start", serviceData);
   }
 
+  pauseTimer() {
+    this._hass.callService("timer", "pause", {
+      entity_id: this._entity
+    });
+  }
+
+  cancelTimer() {
+    this._hass.callService("timer", "cancel", {
+      entity_id: this._entity
+    });
+  }
+
   protected render() {
     let content: TemplateResult;
     if (!this._state) {
       content = html` entity: ${this._entity} not available <br />`;
     } else {
       content = html`
-        <div class="card-content">
-          <div class="timer-duration">
-            <div>Timer: ${this._name}</div>
-            ${this.isTimerActive
-              ? html`<div>Remaining: ${this.remainingTime}</div>`
-              : ""}
-            <form id="time-inputs">
-              <div>
-                <label>Hours</label>
-                <input
-                  type="number"
-                  min="00"
-                  .value=${this.timerDuration.hours}
-                  @input=${(e: Event) =>
-                    this.updateTime(
-                      "hours",
-                      (e.target as HTMLInputElement).value
-                    )}
-                />
-              </div>
-              <span>:</span>
-              <div>
-                <label>Minutes</label>
-                <input
-                  type="number"
-                  min="00"
-                  max="59"
-                  .value=${this.timerDuration.minutes}
-                  @input=${(e: Event) =>
-                    this.updateTime(
-                      "minutes",
-                      (e.target as HTMLInputElement).value
-                    )}
-                />
-              </div>
-              <span>:</span>
-              <div>
-                <label>Seconds</label>
-                <input
-                  type="number"
-                  min="00"
-                  max="59"
-                  .value=${this.timerDuration.seconds}
-                  @input=${(e: Event) =>
-                    this.updateTime(
-                      "seconds",
-                      (e.target as HTMLInputElement).value
-                    )}
-                />
-              </div>
-            </form>
-            <div class="timer-controls">
-              <mwc-button @click=${this.updateTimerDuration}>Start</mwc-button>
+        <div class="card-content compact">
+          <div class="timer-header">
+            <span class="timer-name">${this._name}</span>
+            <span class="remaining-time ${this.isTimerActive ? 'active' : ''}">${this.remainingTime}</span>
+          </div>
+          <div class="timer-controls">
+            <div class="single-input-container">
+              <ha-textfield
+                .value=${this.durationInput}
+                @input=${(e: Event) => this.updateTime((e.target as HTMLInputElement).value)}
+                @blur=${this.handleBlur}
+                @keydown=${this.handleKeyDown}
+                class="single-time-field"
+                placeholder="HH:MM:SS"
+              ></ha-textfield>
+              ${this.isTimerActive ? html`
+                <div class="active-buttons">
+                  <ha-icon-button
+                    @click=${this.pauseTimer}
+                    .path=${"M14,19H18V5H14M6,19H10V5H6V19Z"}
+                    title="Pause"
+                    class="action-button"
+                  ></ha-icon-button>
+                  <ha-icon-button
+                    @click=${this.cancelTimer}
+                    .path=${"M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"}
+                    title="Cancel"
+                    class="action-button"
+                  ></ha-icon-button>
+                </div>
+              ` : html`
+                <ha-button
+                  class="start-button"
+                  @click=${this.updateTimerDuration}
+                  .primary=${true}
+                >
+                  Start
+                </ha-button>
+              `}
             </div>
           </div>
         </div>
@@ -135,7 +223,7 @@ export class TimerCard extends LitElement {
     }
     return html`
       <ha-card header="${this._header}">
-        <div class="card-content">${content}</div>
+        ${content}
       </ha-card>
     `;
   }
@@ -156,19 +244,8 @@ export class TimerCard extends LitElement {
   }
 
   async fetchTimerState() {
-    const timerState = this._state;
-
-    if (timerState) {
-      this.isTimerActive = timerState.attributes.remaining !== undefined;
-
-      if (this.isTimerActive) {
-        // Check if the timer has a finishes_at attribute
-        if (timerState.attributes.finishes_at) {
-          this.remainingTime = this.calculateRemainingTimeFromTimestamp(
-            timerState.attributes.finishes_at
-          );
-        }
-      }
+    if (this._state) {
+      this.updateTimerStateFromEntity();
     }
   }
 
@@ -197,65 +274,91 @@ export class TimerCard extends LitElement {
   static get styles(): CSSResultGroup {
     return [
       css`
-        .timer-duration {
-          align-items: center;
+        .card-content.compact {
+          padding: 8px;
+        }
+        
+        .timer-header {
           display: flex;
           justify-content: space-between;
-        }
-
-        #time-inputs {
           align-items: center;
+          margin-bottom: 8px;
+          font-size: 14px;
+        }
+        
+        .timer-name {
+          font-weight: 500;
+        }
+        
+        .remaining-time {
+          font-weight: bold;
+          color: var(--secondary-text-color);
+          font-family: var(--paper-font-common-mono);
+        }
+        
+        .remaining-time.active {
+          color: var(--primary-color);
+        }
+        
+        .timer-controls {
           display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        
+        .single-input-container {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          width: 100%;
           justify-content: space-between;
         }
-
-        #time-inputs > div {
-          align-items: center;
-          display: flex;
-          flex-direction: column-reverse;
-          margin: 0 10px;
+        
+        .single-time-field {
+          --mdc-shape-small: 4px;
+          --mdc-text-field-fill-color: var(--card-background-color);
+          --mdc-typography-subtitle1-font-size: 16px;
+          width: 70%;
+          --text-field-text-align: center;
         }
-
-        .timer-controls mwc-button {
-          --mdc-theme-primary: white; /* This will change the text color */
-          --mdc-theme-on-primary: green; /* This will change the background color */
-        }
-
-        input {
-          width: 60px;
-          padding: 4px;
-          border: 1px solid #ccc;
-          border-radius: 4px;
-          box-sizing: border-box;
+        
+        /* Center the text in ha-textfield */
+        ha-textfield::part(input) {
           text-align: center;
+          font-family: var(--paper-font-common-mono);
+          letter-spacing: 0.1em;
         }
-
-        #time-inputs > div > input {
-          border: none;
-          border-bottom: 1px solid black;
+        
+        .start-button {
+          --mdc-theme-primary: var(--primary-color);
+          min-width: auto;
+          padding: 0 12px;
         }
-
-        /* Hide arrows on number inputs for Chrome, Safari, Edge, Opera */
-        #time-inputs > div > input[type="number"]::-webkit-inner-spin-button,
-        #time-inputs > div > input[type="number"]::-webkit-outer-spin-button {
-          -webkit-appearance: none;
-          margin: 0;
+        
+        .active-buttons {
+          display: flex;
+          gap: 4px;
         }
-
-        /* Hide arrows on number inputs for Firefox */
-        #time-inputs > div > input[type="number"] {
-          -moz-appearance: textfield;
-        }
-
-        button:hover {
-          background-color: #45a049;
+        
+        .action-button {
+          color: var(--primary-color);
+          --mdc-icon-button-size: 36px;
         }
       `,
     ];
   }
+
   //TODO: make this dynamic
   getCardSize() {
-    return 4;
+    return 2; // Reduced from 3 since we made it more compact
+  }
+
+  getLayoutOptions() {
+    return {
+      grid_rows: 2,
+      grid_columns: 3,
+      grid_min_rows: 2, // Reduced from 3
+    };
   }
 
   static getConfigElement() {

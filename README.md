@@ -1,4 +1,5 @@
 # :clock12: Timer Control Card (:warning:WIP)
+
 ![card_screenshot](assets/card.png)
 
 Timer Control is a simple card that lets you target a timer entity in Home assistant and set it's time attributes from your dashboard
@@ -11,7 +12,7 @@ I am not responsible for:
 - Burnt Houses
 - Dead Plants
 
-or anything else that may casue harm if a timer is missed.
+or anything else that may cause harm if a timer is missed.
 
 ## Usage
 
@@ -38,9 +39,4 @@ to configure the card add the following to your dashboard
   header: "My Testing Timer"
 ```
 
-## TODO
-
-- [ ] Better styling
-- [x] Use the entity picker to select your timer entity
-- [x] Fix editor issues with state not updating
-  - [ ] Handle user pressing enter to accept the dialog
+or use the UI to configure a timer entity
